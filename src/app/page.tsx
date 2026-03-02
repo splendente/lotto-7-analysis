@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { ThemeToggle } from "../components/theme-toggle";
+import { useState, useEffect, useMemo } from "react";
 import resultsData from "../data/results.json";
 
 type ViewMode = "heatmap" | "cold" | "consecutive" | "correlation";
@@ -70,6 +69,136 @@ export default function Home() {
     ...numbers.map((n) => stats[n].correlation),
     1,
   );
+
+  const predictionResult = useMemo(() => {
+    const picked: { num: number; reason: string }[] = [];
+    const remaining = [...numbers];
+
+    // 各指標の重み（予測の調整用）
+    const freqWeight = 1.0;
+    const absenceWeight = 1.5;
+    const correlationWeight = 1.2;
+
+    while (picked.length < 7) {
+      const scores = remaining.map((num) => {
+        const { freq, absence } = stats[num];
+
+        const freqScore = maxFreq > 0 ? (freq / maxFreq) * freqWeight : 0;
+        const absenceScore =
+          maxAbsence > 0 ? (absence / maxAbsence) * absenceWeight : 0;
+
+        let score = freqScore + absenceScore;
+        let correlationScore = 0;
+
+        if (picked.length > 0) {
+          let totalCorrelation = 0;
+          let maxPossibleCorrelation = 1;
+
+          for (const p of picked) {
+            let occurrences = 0;
+            for (const r of reversedResults) {
+              const nums = r.main_numbers.map((n) => Number.parseInt(n, 10));
+              if (nums.includes(num) && nums.includes(p.num)) occurrences++;
+            }
+            totalCorrelation += occurrences;
+            maxPossibleCorrelation += stats[p.num].freq;
+          }
+
+          correlationScore =
+            (totalCorrelation / maxPossibleCorrelation) * correlationWeight;
+          score += correlationScore;
+        }
+
+        // 一番スコアの貢献度が高い理由を特定
+        let mainReason = "統計バランス";
+        if (
+          absenceScore > freqScore &&
+          absenceScore > correlationScore &&
+          absence > maxAbsence * 0.5
+        ) {
+          mainReason = "長期待機";
+        } else if (
+          freqScore > absenceScore &&
+          freqScore > correlationScore &&
+          freq > maxFreq * 0.6
+        ) {
+          mainReason = "高頻度";
+        } else if (
+          correlationScore > freqScore &&
+          correlationScore > absenceScore
+        ) {
+          mainReason = "相性よし";
+        } else if (stats[num].consecutive >= 2) {
+          mainReason = "連続出現中";
+        }
+
+        return { score: Math.max(score, 0.1), reason: mainReason };
+      });
+
+      // 最もスコアが高い番号を選ぶ（完全なスコア順）
+      let maxScoreIndex = 0;
+      let maxScoreValue = -1;
+
+      for (let i = 0; i < scores.length; i++) {
+        if (scores[i].score > maxScoreValue) {
+          maxScoreValue = scores[i].score;
+          maxScoreIndex = i;
+        }
+      }
+
+      picked.push({
+        num: remaining[maxScoreIndex],
+        reason: scores[maxScoreIndex].reason,
+      });
+      remaining.splice(maxScoreIndex, 1);
+    }
+
+    const sortedPicked = picked.sort((a, b) => a.num - b.num);
+
+    // まとめの文章を生成
+    const groups: Record<string, number[]> = {};
+    sortedPicked.forEach((p) => {
+      if (!groups[p.reason]) groups[p.reason] = [];
+      groups[p.reason].push(p.num);
+    });
+
+    const phrases: string[] = [];
+    if (groups["連続出現中"])
+      phrases.push(
+        `直近で連続して当せん中の【${groups["連続出現中"].join(", ")}】`,
+      );
+    if (groups["高頻度"])
+      phrases.push(
+        `過去の全当せんの中で出現回数が多い【${groups["高頻度"].join(", ")}】`,
+      );
+    if (groups["長期待機"])
+      phrases.push(
+        `最近長らく出ておらずそろそろ出そうな【${groups["長期待機"].join(
+          ", ",
+        )}】`,
+      );
+    if (groups["相性よし"])
+      phrases.push(
+        `選出された番号と過去一緒に出やすい【${groups["相性よし"].join(
+          ", ",
+        )}】`,
+      );
+    if (groups["統計バランス"])
+      phrases.push(
+        `他の指標と合わせて総合的なバランスが良い【${groups[
+          "統計バランス"
+        ].join(", ")}】`,
+      );
+
+    const summaryText =
+      phrases.join("、") +
+      "という観点から、次回最も当せん確率が高い組み合わせを予測しました。";
+
+    return {
+      numbers: sortedPicked.map((p) => p.num),
+      summary: summaryText,
+    };
+  }, [maxFreq, maxAbsence, maxCorrelation, numbers, reversedResults]);
 
   // --- Render Helpers ---
   const getPanelData = (num: number) => {
@@ -195,13 +324,38 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-4 font-sans transition-colors duration-300 sm:p-8 dark:bg-black">
+    <div className="flex flex-col items-center bg-zinc-50 p-4 pt-8 font-sans transition-colors duration-300 sm:p-8 sm:pt-12 dark:bg-black w-full flex-1">
       <main className="flex w-full max-w-2xl flex-col items-center gap-6 sm:gap-8">
         <div className="relative flex w-full flex-col items-center text-center">
-          <div className="absolute right-0 -top-2 sm:top-0">
-            <ThemeToggle />
+          <h2 className="mb-2 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50">
+            第{resultsData.results.length + 1}回の予測
+          </h2>
+        </div>
+        <div className="flex w-full max-w-md flex-col items-center rounded-xl bg-white p-4 shadow-sm sm:p-6 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+          
+          <div className="flex min-h-[60px] w-full flex-col items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 dark:bg-black dark:border-zinc-800 p-4">
+            <div className="flex flex-col items-center gap-4 w-full">
+              <div className="flex w-full items-center justify-start sm:justify-center overflow-x-auto pb-1 scrollbar-hide">
+                <div className="flex shrink-0 gap-2 sm:gap-3 mx-auto px-2">
+                  {predictionResult.numbers.map((num) => (
+                    <div
+                      key={num}
+                      className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 font-bold text-white shadow-sm transition-all text-xs sm:text-sm"
+                    >
+                      {num}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed text-center px-2">
+                {predictionResult.summary}
+              </p>
+            </div>
           </div>
-          <h1 className="mb-2 pr-12 text-2xl font-bold tracking-tight text-zinc-900 sm:pr-0 sm:text-3xl dark:text-zinc-50">
+        </div>
+
+        <div className="relative flex w-full flex-col items-center text-center">
+          <h1 className="mb-2 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50">
             {titles[viewMode]}
           </h1>
           <p className="mb-4 max-w-lg px-2 text-sm text-zinc-600 dark:text-zinc-400 text-left sm:text-center">
