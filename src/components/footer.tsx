@@ -18,7 +18,8 @@ export function Footer() {
           &copy; {currentYear} Lotto 7 Analysis. All rights reserved.
         </p>
         <p className="text-[10px] text-zinc-400 dark:text-zinc-500 max-w-md mt-1">
-          ※ 当サイトの分析・予測結果は当せんを保証するものではありません。宝くじの購入は自己責任でお願いいたします。
+          ※
+          当サイトの分析・予測結果は当せんを保証するものではありません。宝くじの購入は自己責任でお願いいたします。
         </p>
       </div>
     </footer>

@@ -32,9 +32,7 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Header />
-          <div className="flex-1 flex flex-col">
-            {children}
-          </div>
+          <div className="flex-1 flex flex-col">{children}</div>
           <Footer />
         </ThemeProvider>
       </body>

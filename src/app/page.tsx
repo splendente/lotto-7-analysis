@@ -332,7 +332,6 @@ export default function Home() {
           </h2>
         </div>
         <div className="flex w-full max-w-md flex-col items-center rounded-xl bg-white p-4 shadow-sm sm:p-6 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-          
           <div className="flex min-h-[60px] w-full flex-col items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 dark:bg-black dark:border-zinc-800 p-4">
             <div className="flex flex-col items-center gap-4 w-full">
               <div className="flex w-full items-center justify-start sm:justify-center overflow-x-auto pb-1 scrollbar-hide">

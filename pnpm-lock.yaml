@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@opennextjs/cloudflare':
+        specifier: ^1.17.1
+        version: 1.17.1(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@4.69.0)
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.2.3)
@@ -27,9 +30,6 @@ importers:
       '@biomejs/biome':
         specifier: 2.2.0
         version: 2.2.0
-      '@opennextjs/cloudflare':
-        specifier: ^1.17.1
-        version: 1.17.1(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@4.69.0)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.2.1
@@ -48,6 +48,9 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
+      wrangler:
+        specifier: ^4.69.0
+        version: 4.69.0
 
 packages:
 
@@ -1927,6 +1930,7 @@ packages:
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
+    deprecated: Use your platform's native DOMException instead
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
