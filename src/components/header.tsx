@@ -13,7 +13,7 @@ export function Header() {
             Lotto 7 Analysis
           </span>
         </div>
-        
+
         <div className="flex items-center">
           <ThemeToggle />
         </div>
