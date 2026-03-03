@@ -1,67 +1,19 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import resultsData from "../data/results.json";
+import { calculateStats, predictNext } from "../lib/predictor";
 
 type ViewMode = "heatmap" | "cold" | "consecutive" | "correlation";
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>("heatmap");
   const [selectedNumber, setSelectedNumber] = useState<number>(1);
-  const numbers = Array.from({ length: 37 }, (_, i) => i + 1);
 
-  // We need to process results from newest to oldest for absence and consecutive calculations
-  const reversedResults = [...resultsData.results].reverse();
-
-  // --- Calculate Statistics ---
-  const stats: Record<
-    number,
-    { freq: number; absence: number; consecutive: number; correlation: number }
-  > = {};
-  for (const n of numbers) {
-    stats[n] = { freq: 0, absence: -1, consecutive: 0, correlation: 0 };
-  }
-
-  // Calculate frequency and absence
-  reversedResults.forEach((result, index) => {
-    const mainNums = result.main_numbers.map((nStr) =>
-      Number.parseInt(nStr, 10),
-    );
-    const hasSelected = mainNums.includes(selectedNumber);
-
-    for (const n of numbers) {
-      if (mainNums.includes(n)) {
-        stats[n].freq++;
-        if (stats[n].absence === -1) {
-          stats[n].absence = index;
-        }
-        if (hasSelected && n !== selectedNumber) {
-          stats[n].correlation++;
-        }
-      }
-    }
-  });
-
-  // Calculate consecutive appearances
-  for (const n of numbers) {
-    let consecutiveCount = 0;
-    for (const result of reversedResults) {
-      const mainNums = result.main_numbers.map((nStr) =>
-        Number.parseInt(nStr, 10),
-      );
-      if (mainNums.includes(n)) {
-        consecutiveCount++;
-      } else {
-        break;
-      }
-    }
-    stats[n].consecutive = consecutiveCount;
-
-    // For numbers that never appeared, set absence to max possible
-    if (stats[n].absence === -1) {
-      stats[n].absence = reversedResults.length;
-    }
-  }
+  const { numbers, stats } = useMemo(
+    () => calculateStats(resultsData.results, selectedNumber),
+    [selectedNumber],
+  );
 
   const maxFreq = Math.max(...numbers.map((n) => stats[n].freq), 1);
   const maxAbsence = Math.max(...numbers.map((n) => stats[n].absence), 1);
@@ -70,135 +22,7 @@ export default function Home() {
     1,
   );
 
-  const predictionResult = useMemo(() => {
-    const picked: { num: number; reason: string }[] = [];
-    const remaining = [...numbers];
-
-    // 各指標の重み（予測の調整用）
-    const freqWeight = 1.0;
-    const absenceWeight = 1.5;
-    const correlationWeight = 1.2;
-
-    while (picked.length < 7) {
-      const scores = remaining.map((num) => {
-        const { freq, absence } = stats[num];
-
-        const freqScore = maxFreq > 0 ? (freq / maxFreq) * freqWeight : 0;
-        const absenceScore =
-          maxAbsence > 0 ? (absence / maxAbsence) * absenceWeight : 0;
-
-        let score = freqScore + absenceScore;
-        let correlationScore = 0;
-
-        if (picked.length > 0) {
-          let totalCorrelation = 0;
-          let maxPossibleCorrelation = 1;
-
-          for (const p of picked) {
-            let occurrences = 0;
-            for (const r of reversedResults) {
-              const nums = r.main_numbers.map((n) => Number.parseInt(n, 10));
-              if (nums.includes(num) && nums.includes(p.num)) occurrences++;
-            }
-            totalCorrelation += occurrences;
-            maxPossibleCorrelation += stats[p.num].freq;
-          }
-
-          correlationScore =
-            (totalCorrelation / maxPossibleCorrelation) * correlationWeight;
-          score += correlationScore;
-        }
-
-        // 一番スコアの貢献度が高い理由を特定
-        let mainReason = "統計バランス";
-        if (
-          absenceScore > freqScore &&
-          absenceScore > correlationScore &&
-          absence > maxAbsence * 0.5
-        ) {
-          mainReason = "長期待機";
-        } else if (
-          freqScore > absenceScore &&
-          freqScore > correlationScore &&
-          freq > maxFreq * 0.6
-        ) {
-          mainReason = "高頻度";
-        } else if (
-          correlationScore > freqScore &&
-          correlationScore > absenceScore
-        ) {
-          mainReason = "相性よし";
-        } else if (stats[num].consecutive >= 2) {
-          mainReason = "連続出現中";
-        }
-
-        return { score: Math.max(score, 0.1), reason: mainReason };
-      });
-
-      // 最もスコアが高い番号を選ぶ（完全なスコア順）
-      let maxScoreIndex = 0;
-      let maxScoreValue = -1;
-
-      for (let i = 0; i < scores.length; i++) {
-        if (scores[i].score > maxScoreValue) {
-          maxScoreValue = scores[i].score;
-          maxScoreIndex = i;
-        }
-      }
-
-      picked.push({
-        num: remaining[maxScoreIndex],
-        reason: scores[maxScoreIndex].reason,
-      });
-      remaining.splice(maxScoreIndex, 1);
-    }
-
-    const sortedPicked = picked.sort((a, b) => a.num - b.num);
-
-    // まとめの文章を生成
-    const groups: Record<string, number[]> = {};
-    sortedPicked.forEach((p) => {
-      if (!groups[p.reason]) groups[p.reason] = [];
-      groups[p.reason].push(p.num);
-    });
-
-    const phrases: string[] = [];
-    if (groups["連続出現中"])
-      phrases.push(
-        `直近で連続して当せん中の【${groups["連続出現中"].join(", ")}】`,
-      );
-    if (groups["高頻度"])
-      phrases.push(
-        `過去の全当せんの中で出現回数が多い【${groups["高頻度"].join(", ")}】`,
-      );
-    if (groups["長期待機"])
-      phrases.push(
-        `最近長らく出ておらずそろそろ出そうな【${groups["長期待機"].join(
-          ", ",
-        )}】`,
-      );
-    if (groups["相性よし"])
-      phrases.push(
-        `選出された番号と過去一緒に出やすい【${groups["相性よし"].join(
-          ", ",
-        )}】`,
-      );
-    if (groups["統計バランス"])
-      phrases.push(
-        `他の指標と合わせて総合的なバランスが良い【${groups[
-          "統計バランス"
-        ].join(", ")}】`,
-      );
-
-    const summaryText =
-      phrases.join("、") +
-      "という観点から、次回最も当せん確率が高い組み合わせを予測しました。";
-
-    return {
-      numbers: sortedPicked.map((p) => p.num),
-      summary: summaryText,
-    };
-  }, [maxFreq, maxAbsence, maxCorrelation, numbers, reversedResults]);
+  const predictionResult = useMemo(() => predictNext(resultsData.results), []);
 
   // --- Render Helpers ---
   const getPanelData = (num: number) => {
