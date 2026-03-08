@@ -1,0 +1,62 @@
+name: Scrape Loto 7 Results
+
+on:
+  schedule:
+    # Runs at 22:05 JST (13:05 UTC) every Friday
+    - cron: '5 13 * * 5'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  scrape-and-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chrome dependencies for Puppeteer
+        run: npx puppeteer browsers install chrome
+
+      - name: Run scraper
+        run: node scripts/scrape.mjs
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "feat: add latest loto 7 results"
+          title: "feat: add latest loto 7 results"
+          body: |
+            Automated PR to add the latest Loto 7 results.
+            
+            This PR is automatically created by a GitHub Actions workflow.
+          branch: "chore/update-loto7-results"
+          delete-branch: true
+          base: main
