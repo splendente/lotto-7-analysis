@@ -53,6 +53,9 @@ jobs:
       - name: Run scraper
         run: node scripts/scrape.mjs
 
+      - name: Run formatter
+        run: pnpm run format
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
